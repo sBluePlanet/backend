@@ -18,4 +18,7 @@ public class Ending {
 
     @Column(columnDefinition = "TEXT")
     private String content;
+
+    @Column(name = "img_url", length = 500)
+    private String imgUrl;
 }
