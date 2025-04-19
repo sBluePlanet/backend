@@ -3,6 +3,9 @@ package com.klpj.blueplanet.model.dto;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.time.LocalDateTime;
 import java.util.Date;
 
 @Data
@@ -27,4 +30,8 @@ public class UserChoiceHistory {
     // 선택한 시각 (자동으로 현재 시각 저장)
     @Temporal(TemporalType.TIMESTAMP)
     private Date chosenAt = new Date();
+
+    @CreationTimestamp
+    @Column(updatable = false)
+    private LocalDateTime createdAt;
 }

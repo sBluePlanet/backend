@@ -39,8 +39,8 @@ public class DataController {
     @GetMapping("/emailDetail")
     public ResponseEntity<EmailDetailResponse> getEmailDetail(
             @RequestParam("userId") Long userId,
-            @RequestParam("eventId") Long eventId) {
-        EmailDetailResponse response = dataService.getEmailDetail(userId, eventId);
+            @RequestParam("eventId") Long id) {
+        EmailDetailResponse response = dataService.getEmailDetail(userId, id);
         return ResponseEntity.ok(response);
     }
 

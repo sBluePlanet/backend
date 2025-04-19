@@ -13,7 +13,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class EmailDetailResponse {
-    private Long eventId;
+    private Long id;
     private String title;
     private String writer;
     private String content;
