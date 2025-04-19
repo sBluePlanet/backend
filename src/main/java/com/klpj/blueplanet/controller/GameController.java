@@ -1,10 +1,13 @@
 package com.klpj.blueplanet.controller;
 
 import com.klpj.blueplanet.model.dao.EndingDao;
+import com.klpj.blueplanet.model.dao.UserStatusDao;
 import com.klpj.blueplanet.model.dto.Ending;
+import com.klpj.blueplanet.model.dto.UserStatus;
 import com.klpj.blueplanet.model.requests.ChoiceRequest;
 import com.klpj.blueplanet.model.responses.GameUpdateResponse;
 import com.klpj.blueplanet.model.responses.NextEventResponse;
+import com.klpj.blueplanet.model.responses.SpecialEventResponse;
 import com.klpj.blueplanet.model.responses.StartGameResponse;
 import com.klpj.blueplanet.model.services.GameService;
 import org.slf4j.Logger;
@@ -36,6 +39,10 @@ public class GameController {
 
     @Autowired
     private EndingDao endingDao;
+
+    @Autowired
+    private UserStatusDao userStatusDao;
+
 
     /**
      * 게임 시작 시 고유한 로그 식별자를 생성하고 MDC에 설정합니다.
@@ -79,6 +86,27 @@ public class GameController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/special")
+    public ResponseEntity<SpecialEventResponse> triggerSpecialEvent(
+            @RequestParam("userId") Long userId,
+            @RequestParam(value = "gameLogFile", required = false) String gameLogFile) {
+        // MDC 값 재설정
+        if (gameLogFile != null && !gameLogFile.isEmpty()) {
+            MDC.put("gameLogFile", gameLogFile);
+        }
+        try {
+            SpecialEventResponse response = gameService.triggerSpecialEventIfAny(userId);
+            // 수정: SpecialEventResponse의 getTitle()을 이용하여 제목을 기록
+            gameLogger.info("User {} triggered special event: {}.", userId, response.getTitle());
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            gameLogger.info("User {} did not trigger any special event. Reason: {}", userId, e.getMessage());
+            return ResponseEntity.noContent().build();
+        }
+    }
+
+
+
     /**
      * /choice 엔드포인트에서도 클라이언트가 gameLogFile 식별자를 함께 보내야 합니다.
      * 이를 바탕으로 MDC를 재설정하고 로그를 기록합니다.
@@ -103,17 +131,35 @@ public class GameController {
      * /ending 엔드포인트 역시 gameLogFile 식별자를 이용하여 MDC를 설정합니다.
      */
     @GetMapping("/ending")
-    public ResponseEntity<Ending> getEnding(
-            @RequestParam("endingId") int endingId,
+    public ResponseEntity<Ending> getEndingEvent(
+            @RequestParam("userId") Long userId,
             @RequestParam(value = "gameLogFile", required = false) String gameLogFile) {
+
         if (gameLogFile != null && !gameLogFile.isEmpty()) {
             MDC.put("gameLogFile", gameLogFile);
         }
 
-        gameLogger.info("Ending requested with id {}.", endingId);
+        // 1. 사용자 상태 조회
+        UserStatus userStatus = userStatusDao.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
 
+        // 2. 엔딩 조건 판단
+        int endingId = gameService.determineEndingId(userStatus);
+
+        if (endingId == 0) {
+            gameLogger.warn("User {} does not meet any ending condition. Skipping ending event.", userId);
+            return ResponseEntity.noContent().build(); // or throw error
+        }
+
+        // 3. 엔딩 데이터 조회
         Ending ending = endingDao.findById((long) endingId)
                 .orElseThrow(() -> new RuntimeException("Ending not found with id: " + endingId));
+
+        // 4. 로깅
+        gameLogger.info("User {} triggered ending {}: {}",
+                userId, ending.getId(), ending.getTitle());
+
+        // 5. 응답 반환
         return ResponseEntity.ok(ending);
     }
 }

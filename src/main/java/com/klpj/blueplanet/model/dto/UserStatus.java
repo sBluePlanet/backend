@@ -26,9 +26,14 @@ public class UserStatus {
     @Column(name = "turn_count")
     private int turnCount;
 
-    // 사용된 이벤트 ID를 저장
-    @ElementCollection(fetch = FetchType.LAZY)
+    // 사용된 상시이벤트 ID를 저장하는 집합
     @CollectionTable(name = "user_status_used_events", joinColumns = @JoinColumn(name = "user_status_id"))
     @Column(name = "event_id")
     private Set<Long> usedEventIds = new HashSet<>();
+
+    // 사용된 특별이벤트 ID를 저장하는 집합
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "user_status_used_special_events", joinColumns = @JoinColumn(name = "user_status_id"))
+    @Column(name = "special_event_id")
+    private Set<Long> usedSpecialEventIds = new HashSet<>();
 }
