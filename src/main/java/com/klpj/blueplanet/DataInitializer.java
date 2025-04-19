@@ -7,139 +7,163 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.io.InputStream;
 
+/**
+ * 데이터베이스를 매번 초기화하고
+ * 최신 XLSX 파일로 덮어씁니다.
+ * 모든 테이블을 truncate하여 시퀀스를 리셋하고,
+ * 관계형 제약 조건을 CASCADE 처리합니다.
+ */
 @Component
 @RequiredArgsConstructor
 public class DataInitializer {
+    private static final Logger logger = LoggerFactory.getLogger(DataInitializer.class);
 
+    private final JdbcTemplate jdbcTemplate;
+    private final PrologueDao prologueDao;
     private final EventDao eventDao;
     private final ChoiceDao choiceDao;
     private final EndingDao endingDao;
     private final TooltipDao tooltipDao;
     private final SpecialEventDao specialEventDao;
     private final SpecialEventConditionDao specialEventConditionDao;
-    private final PrologueDao prologueDao; // 추가된 PrologueDao
 
     @PostConstruct
     public void init() {
-        if (eventDao.count() == 0) {
-            // Prologue 데이터 초기화 추가
-            initPrologue();
-            initEvents();
-            initChoices();
-            initEndings();
-            initTooltips();
-            initSpecialEvents();
-            initSpecialEventConditions();
-            System.out.println("불변 데이터 삽입 완료!");
-        } else {
-            System.out.println("데이터 이미 존재 — 초기화 생략됨");
+        // 1) 모든 테이블 truncate 및 identity reset
+        String sql = "TRUNCATE TABLE prologues, events, choices, endings, tooltips, special_events, special_event_conditions RESTART IDENTITY CASCADE";
+        jdbcTemplate.execute(sql);
+        logger.info("테이블 초기화 및 시퀀스 리셋 완료");
+
+        // 2) 데이터 로드
+        initPrologue();
+        initEvents();
+        initChoices();
+        initEndings();
+        initTooltips();
+        initSpecialEvents();
+        initSpecialEventConditions();
+
+        logger.info("✅ 데이터 재초기화 완료");
+    }
+
+    private void initPrologue() {
+        try {
+            Prologue p = new Prologue();
+            p.setTitle("게임 시작");
+            p.setContent("환경 문제에 대한 여정을 시작합니다. 여러 이벤트를 통해 환경에 긍정적인 변화를 가져오는 선택을 하게 될 것입니다.");
+            prologueDao.save(p);
+            logger.info("✅ Prologue 초기화 완료");
+        } catch (Exception e) {
+            logger.error("Prologue 로딩 실패", e);
         }
     }
 
-    // Prologue 초기화 (하드코딩 방식)
-    private void initPrologue() {
-        Prologue prologue = new Prologue();
-        prologue.setTitle("게임 시작");
-        prologue.setContent("환경 문제에 대한 여정을 시작합니다. 여러 이벤트를 통해 환경에 긍정적인 변화를 가져오는 선택을 하게 될 것입니다.");
-        prologueDao.save(prologue);
-        System.out.println("✅ Prologue 성공");
-    }
-
     private void initEvents() {
-        try (InputStream is = getClass().getResourceAsStream("/test.data/Event_test.xlsx");
-             Workbook wb = new XSSFWorkbook(is)) {
-            Sheet sheet = wb.getSheetAt(0);
-            for (Row row : sheet) {
+        InputStream is = getClass().getResourceAsStream("/test.data/Event_test.xlsx");
+        if (is == null) {
+            logger.error("Event_test.xlsx not found");
+            return;
+        }
+        try (Workbook wb = new XSSFWorkbook(is)) {
+            for (Row row : wb.getSheetAt(0)) {
                 if (row.getRowNum() == 0) continue;
                 Event e = new Event();
                 e.setTitle(row.getCell(1).getStringCellValue());
                 e.setWriter(row.getCell(2).getStringCellValue());
                 e.setContent(row.getCell(3).getStringCellValue());
                 eventDao.save(e);
-                System.out.println("✅ Event 성공");
             }
+            logger.info("✅ Events 초기화 완료");
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Events 로딩 실패", e);
         }
     }
 
     private void initChoices() {
-        try (InputStream is = getClass().getResourceAsStream("/test.data/Choice_test.xlsx");
-             Workbook wb = new XSSFWorkbook(is)) {
-            Sheet sheet = wb.getSheetAt(0);
-            for (Row row : sheet) {
+        InputStream is = getClass().getResourceAsStream("/test.data/Choice_test.xlsx");
+        if (is == null) {
+            logger.error("Choice_test.xlsx not found");
+            return;
+        }
+        try (Workbook wb = new XSSFWorkbook(is)) {
+            for (Row row : wb.getSheetAt(0)) {
                 if (row.getRowNum() == 0) continue;
                 long eventId = (long) row.getCell(1).getNumericCellValue();
-                Event event = eventDao.findById(eventId).orElse(null);
-                if (event == null) continue;
-
-                Choice c = new Choice();
-                c.setEvent(event);
-                c.setAirImpact((int) row.getCell(2).getNumericCellValue());
-                c.setWaterImpact((int) row.getCell(3).getNumericCellValue());
-                c.setBiologyImpact((int) row.getCell(4).getNumericCellValue());
-                c.setPopularityImpact((int) row.getCell(5).getNumericCellValue());
-                c.setResult(row.getCell(6).getStringCellValue());
-                c.setContent(row.getCell(7).getStringCellValue());
-                choiceDao.save(c);
-                System.out.println("✅ Choice 성공");
+                eventDao.findById(eventId).ifPresent(event -> {
+                    Choice c = new Choice();
+                    c.setEvent(event);
+                    c.setAirImpact((int) row.getCell(2).getNumericCellValue());
+                    c.setWaterImpact((int) row.getCell(3).getNumericCellValue());
+                    c.setBiologyImpact((int) row.getCell(4).getNumericCellValue());
+                    c.setPopularityImpact((int) row.getCell(5).getNumericCellValue());
+                    c.setResult(row.getCell(6).getStringCellValue());
+                    c.setContent(row.getCell(7).getStringCellValue());
+                    choiceDao.save(c);
+                });
             }
+            logger.info("✅ Choices 초기화 완료");
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Choices 로딩 실패", e);
         }
     }
 
     private void initEndings() {
-        try (InputStream is = getClass().getResourceAsStream("/test.data/Ending_test.xlsx");
-             Workbook wb = new XSSFWorkbook(is)) {
-            Sheet sheet = wb.getSheetAt(0);
-            for (Row row : sheet) {
+        InputStream is = getClass().getResourceAsStream("/test.data/Ending_test.xlsx");
+        if (is == null) {
+            logger.error("Ending_test.xlsx not found");
+            return;
+        }
+        try (Workbook wb = new XSSFWorkbook(is)) {
+            for (Row row : wb.getSheetAt(0)) {
                 if (row.getRowNum() == 0) continue;
                 Ending e = new Ending();
                 e.setTitle(row.getCell(1).getStringCellValue());
                 e.setContent(row.getCell(2).getStringCellValue());
                 endingDao.save(e);
-                System.out.println("✅ Ending 성공");
             }
+            logger.info("✅ Endings 초기화 완료");
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Endings 로딩 실패", e);
         }
     }
 
     private void initTooltips() {
-        try (InputStream is = getClass().getResourceAsStream("/test.data/Tooltip_test.xlsx");
-             Workbook workbook = new XSSFWorkbook(is)) {
-
-            Sheet sheet = workbook.getSheetAt(0);
-            for (Row row : sheet) {
+        InputStream is = getClass().getResourceAsStream("/test.data/Tooltip_test.xlsx");
+        if (is == null) {
+            logger.error("Tooltip_test.xlsx not found");
+            return;
+        }
+        try (Workbook wb = new XSSFWorkbook(is)) {
+            for (Row row : wb.getSheetAt(0)) {
                 if (row.getRowNum() == 0) continue;
-
-                Tooltip tooltip = new Tooltip();
-                tooltip.setKeyword(row.getCell(1).getStringCellValue());
-                tooltip.setContent(row.getCell(2).getStringCellValue());
-
-                tooltipDao.save(tooltip);
-                System.out.println("✅ Tooltip 성공");
+                Tooltip t = new Tooltip();
+                t.setKeyword(row.getCell(1).getStringCellValue());
+                t.setContent(row.getCell(2).getStringCellValue());
+                tooltipDao.save(t);
             }
-            System.out.println("Tooltip 초기화 완료");
+            logger.info("✅ Tooltips 초기화 완료");
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("Tooltips 로딩 실패", e);
         }
     }
 
     private void initSpecialEvents() {
-        try (InputStream is = getClass().getResourceAsStream("/test.data/SpecialEvent_test.xlsx");
-             Workbook wb = new XSSFWorkbook(is)) {
-            Sheet sheet = wb.getSheetAt(0);
-            for (Row row : sheet) {
-                if (row.getRowNum() == 0) continue; // 헤더 스킵
-
+        InputStream is = getClass().getResourceAsStream("/test.data/SpecialEvent_test.xlsx");
+        if (is == null) {
+            logger.error("SpecialEvent_test.xlsx not found");
+            return;
+        }
+        try (Workbook wb = new XSSFWorkbook(is)) {
+            for (Row row : wb.getSheetAt(0)) {
+                if (row.getRowNum() == 0) continue;
                 SpecialEvent s = new SpecialEvent();
-
                 s.setTitle(row.getCell(1).getStringCellValue());
                 s.setContent(row.getCell(2).getStringCellValue());
                 s.setImgUrl(row.getCell(3).getStringCellValue());
@@ -147,41 +171,37 @@ public class DataInitializer {
                 s.setWaterImpact((int) row.getCell(5).getNumericCellValue());
                 s.setBiologyImpact((int) row.getCell(6).getNumericCellValue());
                 s.setPopularityImpact((int) row.getCell(7).getNumericCellValue());
-
                 specialEventDao.save(s);
-                System.out.println("✅ SpecialEvent 성공");
             }
+            logger.info("✅ SpecialEvents 초기화 완료");
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("SpecialEvents 로딩 실패", e);
         }
     }
 
     private void initSpecialEventConditions() {
-        try (InputStream is = getClass().getResourceAsStream("/test.data/SpecialEventCondition_test.xlsx");
-             Workbook wb = new XSSFWorkbook(is)) {
-            Sheet sheet = wb.getSheetAt(0);
-            for (Row row : sheet) {
+        InputStream is = getClass().getResourceAsStream("/test.data/SpecialEventCondition_test.xlsx");
+        if (is == null) {
+            logger.error("SpecialEventCondition_test.xlsx not found");
+            return;
+        }
+        try (Workbook wb = new XSSFWorkbook(is)) {
+            for (Row row : wb.getSheetAt(0)) {
                 if (row.getRowNum() == 0) continue;
-
                 Long seId = (long) row.getCell(1).getNumericCellValue();
-                SpecialEvent se = specialEventDao.findById(seId).orElse(null);
-                if (se == null) {
-                    System.out.println("SpecialEvent not found for id: " + seId);
-                    continue;
-                }
-
-                SpecialEventCondition cond = new SpecialEventCondition();
-                cond.setSpecialEvent(se);
-                cond.setStatusType(row.getCell(2).getStringCellValue());
-                cond.setOperator(row.getCell(3).getStringCellValue());
-                cond.setVariation((int) row.getCell(4).getNumericCellValue());
-                cond.setPriority((int) row.getCell(5).getNumericCellValue());
-
-                specialEventConditionDao.save(cond);
-                System.out.println("✅ SpecialEventCondition 성공");
+                specialEventDao.findById(seId).ifPresent(se -> {
+                    SpecialEventCondition cond = new SpecialEventCondition();
+                    cond.setSpecialEvent(se);
+                    cond.setStatusType(row.getCell(2).getStringCellValue());
+                    cond.setOperator(row.getCell(3).getStringCellValue());
+                    cond.setVariation((int) row.getCell(4).getNumericCellValue());
+                    cond.setPriority((int) row.getCell(5).getNumericCellValue());
+                    specialEventConditionDao.save(cond);
+                });
             }
+            logger.info("✅ SpecialEventConditions 초기화 완료");
         } catch (Exception e) {
-            e.printStackTrace();
+            logger.error("SpecialEventConditions 로딩 실패", e);
         }
     }
 }
