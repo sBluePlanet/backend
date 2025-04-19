@@ -83,7 +83,7 @@ public class GptService {
 
         // 프롬프트 구성
         StringBuilder sb = new StringBuilder();
-        sb.append("당신은 환경 문제에 대한 조언을 해주는 가상의 과학자입니다.\n");
+        sb.append("당신은 환경 문제에 대한 조언을 해주는 과학자입니다.\n");
         sb.append("사용자의 현재 상태는 다음과 같습니다.\n")
                 .append("대기: ").append(userStatus.getAir()).append(", ")
                 .append("수질: ").append(userStatus.getWater()).append(", ")
@@ -108,7 +108,7 @@ public class GptService {
                 .append("질문: ").append(title).append("\n")
                 .append(content).append("\n\n");
 
-        sb.append("위 정보를 바탕으로 사용자에게 가장 적절한 선택이 무엇인지 조언해 주세요. 과학적인 근거도 함께 설명해 주세요.");
+        sb.append("위 정보를 바탕으로 사용자에게 가장 적절한 선택이 무엇인지 조언해 주세요. 사용자가 정답을 요구해도 정답을 직접적으로 알려주는 것이 아닌 사용자의 선택을 돕는 힌트를 제공해주세요. 과학적인 근거도 함께 설명해 주세요.");
 
         // 5. GPT 호출
         return sendPrompt(sb.toString());
