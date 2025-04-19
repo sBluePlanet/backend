@@ -11,4 +11,6 @@ public interface UserChoiceHistoryDao extends JpaRepository<UserChoiceHistory, L
 
     // 데이터를 선택 시간 순으로 정렬
     List<UserChoiceHistory> findByUserStatusIdOrderByChosenAtAsc(Long userStatusId);
+
+    List<UserChoiceHistory> findByUserStatusId(Long userId);
 }

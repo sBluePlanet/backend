@@ -28,4 +28,5 @@ public class Event {
 
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Choice> choices; // 이 이벤트에 연결된 선택지 리스트
+
 }

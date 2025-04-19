@@ -1,6 +1,8 @@
 package com.klpj.blueplanet.controller;
 
 import ch.qos.logback.core.encoder.EchoEncoder;
+import com.klpj.blueplanet.model.dao.AdviceEmailDao;
+import com.klpj.blueplanet.model.dto.AdviceEmail;
 import com.klpj.blueplanet.model.services.GameService;
 import com.klpj.blueplanet.model.services.GptService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +24,9 @@ public class GptController {
 
     @Autowired
     private GameService gameService;
+
+    @Autowired
+    private AdviceEmailDao adviceEmailDao;
 
     @GetMapping("/summary")
     public ResponseEntity<Map<String, String>> summarizeUserFlow(@RequestParam Long userId){
@@ -58,9 +63,18 @@ public class GptController {
 
             String reTitle = "RE:" + title;
 
+            // 응답 저장
+            AdviceEmail adviceEmail = new AdviceEmail();
+            adviceEmail.setUserId(userId);
+            adviceEmail.setEventId(eventId);
+            adviceEmail.setTitle(reTitle);
+            adviceEmail.setContent(advice);
+            adviceEmailDao.save(adviceEmail);
+
             // 결과를 JSON 으로 반환
             Map<String, String> response = Map.of("title", reTitle, "content", advice);
             return ResponseEntity.ok(response);
+
         }catch(Exception e){
             e.printStackTrace();
             return ResponseEntity.status(500).body(Map.of("content", "‼️조언 요청 중 오류 발생"));
