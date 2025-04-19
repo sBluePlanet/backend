@@ -130,7 +130,8 @@ public class GameController {
             // Ending 조회
             Ending ending = endingDao.findById((long) endingId)
                     .orElseThrow(() -> new RuntimeException("Ending not found with id: " + endingId));
-            gameLogger.info("User {} triggered ending {}: {}", userId, ending.getId(), ending.getTitle());
+            gameLogger.info("User {} triggered ending {}: {} (imgUrl={}).",
+                    userId, ending.getId(), ending.getTitle(), ending.getImgUrl());
             return ResponseEntity.ok(ending);
         } finally {
             MDC.remove("gameLogFile");
