@@ -176,10 +176,6 @@ public class GameService {
         // 랜덤으로 이벤트 선택
         Event selectedEvent = availableEvents.get(random.nextInt(availableEvents.size()));
 
-        // 선택된 이벤트 ID를 사용된 이벤트 목록에 추가 및 저장
-        userStatus.getUsedEventIds().add(selectedEvent.getId());
-        userStatusDao.save(userStatus);
-
         // 이벤트 정보를 EventResponse DTO로 생성
         EventResponse eventResponse = new EventResponse(
                 selectedEvent.getId(),
@@ -250,6 +246,10 @@ public class GameService {
         history.setEventId(choice.getEvent().getId());
         history.setChoiceId(choiceId);
         // history.setChosenAt(new Date()); // 기본값 생성자로 이미 현재 시각이 할당됨
+
+        // 선택된 이벤트 ID를 사용된 이벤트 목록에 추가 및 저장
+        userStatus.getUsedEventIds().add(choice.getEvent().getId());
+        userStatusDao.save(userStatus);
 
         userChoiceHistoryDao.save(history);  // UserChoiceHistoryDao를 주입 받아 사용합니다.
 
