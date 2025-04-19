@@ -7,16 +7,18 @@
     <!-- SYSTEM_LOG: 서버 시스템 로그 appender -->
     <appender name="SYSTEM_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>logs/system_${startupTimestamp}.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- 날짜/인덱스 패턴 -->
             <fileNamePattern>logs/system_${startupTimestamp}_%d{yyyy-MM-dd}.%i.log</fileNamePattern>
-            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
-                <maxFileSize>10MB</maxFileSize>
-            </timeBasedFileNamingAndTriggeringPolicy>
+            <!-- 최대 파일 크기(예: 10MB) -->
+            <maxFileSize>10MB</maxFileSize>
+            <!-- 남길 보관 파일 개수 -->
             <maxHistory>30</maxHistory>
+            <!-- 로그 파일 압축 여부 -->
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
         </rollingPolicy>
-        <encoder>
-            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
-            <charset>UTF-8</charset>
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
 
@@ -30,16 +32,18 @@
         <sift>
             <appender name="GAME_LOG-${gameLogFile}" class="ch.qos.logback.core.rolling.RollingFileAppender">
                 <file>logs/game_${gameLogFile}.log</file>
-                <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-                    <fileNamePattern>logs/game_${gameLogFile}_%d{yyyy-MM-dd}.%i.log</fileNamePattern>
-                    <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
-                        <maxFileSize>10MB</maxFileSize>
-                    </timeBasedFileNamingAndTriggeringPolicy>
+                <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                    <!-- 날짜/인덱스 패턴 -->
+                    <fileNamePattern>logs/system_${startupTimestamp}_%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+                    <!-- 최대 파일 크기(예: 10MB) -->
+                    <maxFileSize>10MB</maxFileSize>
+                    <!-- 남길 보관 파일 개수 -->
                     <maxHistory>30</maxHistory>
+                    <!-- 로그 파일 압축 여부 -->
+                    <cleanHistoryOnStart>true</cleanHistoryOnStart>
                 </rollingPolicy>
-                <encoder>
-                    <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
-                    <charset>UTF-8</charset>
+                <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+                    <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
                 </encoder>
             </appender>
         </sift>
