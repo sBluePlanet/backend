@@ -1,10 +1,13 @@
 package com.klpj.blueplanet.controller;
 
 import com.klpj.blueplanet.model.dao.EndingDao;
+import com.klpj.blueplanet.model.dao.UserStatusDao;
 import com.klpj.blueplanet.model.dto.Ending;
+import com.klpj.blueplanet.model.dto.UserStatus;
 import com.klpj.blueplanet.model.requests.ChoiceRequest;
 import com.klpj.blueplanet.model.responses.GameUpdateResponse;
 import com.klpj.blueplanet.model.responses.NextEventResponse;
+import com.klpj.blueplanet.model.responses.SpecialEventResponse;
 import com.klpj.blueplanet.model.responses.StartGameResponse;
 import com.klpj.blueplanet.model.services.GameService;
 import org.slf4j.Logger;
@@ -36,6 +39,9 @@ public class GameController {
 
     @Autowired
     private EndingDao endingDao;
+
+    @Autowired
+    private UserStatusDao userStatusDao;
 
     /**
      * 게임 시작 시 고유한 로그 식별자를 생성하고 MDC에 설정합니다.
@@ -99,21 +105,49 @@ public class GameController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/special")
+    public ResponseEntity<SpecialEventResponse> triggerSpecialEvent(@RequestParam("userId") Long userId) {
+        try {
+            SpecialEventResponse response = gameService.triggerSpecialEventIfAny(userId);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.noContent().build(); // 조건 미충족 시 204 반환
+        }
+    }
+
+
     /**
      * /ending 엔드포인트 역시 gameLogFile 식별자를 이용하여 MDC를 설정합니다.
      */
     @GetMapping("/ending")
-    public ResponseEntity<Ending> getEnding(
-            @RequestParam("endingId") int endingId,
+    public ResponseEntity<Ending> getEndingEvent(
+            @RequestParam("userId") Long userId,
             @RequestParam(value = "gameLogFile", required = false) String gameLogFile) {
         if (gameLogFile != null && !gameLogFile.isEmpty()) {
             MDC.put("gameLogFile", gameLogFile);
         }
 
-        gameLogger.info("Ending requested with id {}.", endingId);
+        // 1. 사용자 상태 조회
+        UserStatus userStatus = userStatusDao.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
 
+        // 2. 엔딩 조건 판단
+        int endingId = gameService.determineEndingId(userStatus);
+
+        if (endingId == 0) {
+            gameLogger.warn("User {} does not meet any ending condition. Skipping ending event.", userId);
+            return ResponseEntity.noContent().build(); // or throw error
+        }
+
+        // 3. 엔딩 데이터 조회
         Ending ending = endingDao.findById((long) endingId)
                 .orElseThrow(() -> new RuntimeException("Ending not found with id: " + endingId));
+
+        // 4. 로깅
+        gameLogger.info("User {} triggered ending {}: {}",
+                userId, ending.getId(), ending.getTitle());
+
+        // 5. 응답 반환
         return ResponseEntity.ok(ending);
     }
 }

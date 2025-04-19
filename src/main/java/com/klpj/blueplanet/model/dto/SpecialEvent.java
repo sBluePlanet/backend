@@ -31,8 +31,8 @@ public class SpecialEvent {
     @Column(name = "water_impact")
     private int waterImpact;
 
-    @Column(name = "ecology_impact")
-    private int ecologyImpact;
+    @Column(name = "biology_impact")
+    private int biologyImpact;
 
     @Column(name = "popularity_impact")
     private int popularityImpact;
