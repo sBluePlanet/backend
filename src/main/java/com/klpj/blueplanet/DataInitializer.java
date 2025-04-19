@@ -21,10 +21,13 @@ public class DataInitializer {
     private final TooltipDao tooltipDao;
     private final SpecialEventDao specialEventDao;
     private final SpecialEventConditionDao specialEventConditionDao;
+    private final PrologueDao prologueDao; // 추가된 PrologueDao
 
     @PostConstruct
     public void init() {
         if (eventDao.count() == 0) {
+            // Prologue 데이터 초기화 추가
+            initPrologue();
             initEvents();
             initChoices();
             initEndings();
@@ -35,6 +38,15 @@ public class DataInitializer {
         } else {
             System.out.println("데이터 이미 존재 — 초기화 생략됨");
         }
+    }
+
+    // Prologue 초기화 (하드코딩 방식)
+    private void initPrologue() {
+        Prologue prologue = new Prologue();
+        prologue.setTitle("게임 시작");
+        prologue.setContent("환경 문제에 대한 여정을 시작합니다. 여러 이벤트를 통해 환경에 긍정적인 변화를 가져오는 선택을 하게 될 것입니다.");
+        prologueDao.save(prologue);
+        System.out.println("✅ Prologue 성공");
     }
 
     private void initEvents() {
@@ -48,7 +60,7 @@ public class DataInitializer {
                 e.setWriter(row.getCell(2).getStringCellValue());
                 e.setContent(row.getCell(3).getStringCellValue());
                 eventDao.save(e);
-                System.out.println("✅Event 성공");
+                System.out.println("✅ Event 성공");
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -90,7 +102,7 @@ public class DataInitializer {
                 e.setTitle(row.getCell(1).getStringCellValue());
                 e.setContent(row.getCell(2).getStringCellValue());
                 endingDao.save(e);
-                System.out.println("✅Ending 성공");
+                System.out.println("✅ Ending 성공");
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -110,7 +122,7 @@ public class DataInitializer {
                 tooltip.setContent(row.getCell(2).getStringCellValue());
 
                 tooltipDao.save(tooltip);
-                System.out.println("✅Tooltip 성공");
+                System.out.println("✅ Tooltip 성공");
             }
             System.out.println("Tooltip 초기화 완료");
         } catch (Exception e) {
@@ -123,7 +135,7 @@ public class DataInitializer {
              Workbook wb = new XSSFWorkbook(is)) {
             Sheet sheet = wb.getSheetAt(0);
             for (Row row : sheet) {
-                if (row.getRowNum() == 0) continue; // Skip header row
+                if (row.getRowNum() == 0) continue; // 헤더 스킵
 
                 SpecialEvent s = new SpecialEvent();
 
@@ -136,13 +148,12 @@ public class DataInitializer {
                 s.setPopularityImpact((int) row.getCell(7).getNumericCellValue());
 
                 specialEventDao.save(s);
-                System.out.println("✅SpecialEvent 성공");
+                System.out.println("✅ SpecialEvent 성공");
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-
 
     private void initSpecialEventConditions() {
         try (InputStream is = getClass().getResourceAsStream("/test.data/SpecialEventCondition_test.xlsx");
@@ -151,7 +162,6 @@ public class DataInitializer {
             for (Row row : sheet) {
                 if (row.getRowNum() == 0) continue;
 
-                // Long으로 읽어오기
                 Long seId = (long) row.getCell(1).getNumericCellValue();
                 SpecialEvent se = specialEventDao.findById(seId).orElse(null);
                 if (se == null) {
@@ -167,13 +177,10 @@ public class DataInitializer {
                 cond.setPriority((int) row.getCell(5).getNumericCellValue());
 
                 specialEventConditionDao.save(cond);
-                System.out.println("✅SpecialEventCondition 성공");
-
+                System.out.println("✅ SpecialEventCondition 성공");
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
-
-
 }
