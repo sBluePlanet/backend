@@ -316,18 +316,6 @@ public class GameService {
         return 0; // 0이면 엔딩 조건 미충족
     }
 
-
-    /**
-     * DB에서 저장된 엔딩 중 하나를 랜덤으로 선택하여 반환합니다.
-     */
-    public Ending getEnding() {
-        List<Ending> endings = endingDao.findAll();
-        if (endings.isEmpty()) {
-            throw new RuntimeException("No ending found.");
-        }
-        return endings.get(random.nextInt(endings.size()));
-    }
-
     public String summarizeUserFlow(Long userId) {
         List<UserChoiceHistory> historyList = userChoiceHistoryDao.findByUserStatusIdOrderByChosenAtAsc(userId);
 

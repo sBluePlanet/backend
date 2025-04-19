@@ -143,7 +143,7 @@ public class DataInitializer {
     private void initEndings() {
         InputStream is = getClass().getResourceAsStream("/data/endings/Endings.xlsx");
         if (is == null) {
-            logger.error("Ending_test.xlsx not found");
+            logger.error("Endings.xlsx not found");
             return;
         }
         try (Workbook wb = new XSSFWorkbook(is)) {
@@ -152,10 +152,11 @@ public class DataInitializer {
                 if (row.getRowNum() == 0) continue;
 
                 try {
-                    String title = getStringSafe(row, 0);
-                    String content = getStringSafe(row, 1);
+                    String title = getStringSafe(row, 1);
+                    String content = getStringSafe(row, 2);
+                    String imgUrl  = getStringSafe(row, 3);
 
-                    if (title == null || title.isBlank() || content == null || content.isBlank()) {
+                    if (title.isBlank() || content.isBlank()) {
                         logger.warn("❗ 빈 값이 있는 row({})는 건너뜀", row.getRowNum());
                         continue;
                     }
@@ -163,6 +164,7 @@ public class DataInitializer {
                     Ending e = new Ending();
                     e.setTitle(title);
                     e.setContent(content);
+                    e.setImgUrl(imgUrl);
 
                     endingDao.save(e);
                 } catch (Exception ex) {
