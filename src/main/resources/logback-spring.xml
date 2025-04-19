@@ -1,20 +1,13 @@
-<?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-
-    <!-- 서버 시작 시 타임스탬프를 설정 (서버가 시작될 때 한번 결정됨) -->
     <timestamp key="startupTimestamp" datePattern="yyMMdd_HHmmss"/>
 
-    <!-- SYSTEM_LOG: 서버 시스템 로그 appender -->
+    <!-- 시스템 로그 -->
     <appender name="SYSTEM_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>logs/system_${startupTimestamp}.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <!-- 날짜/인덱스 패턴 -->
             <fileNamePattern>logs/system_${startupTimestamp}_%d{yyyy-MM-dd}.%i.log</fileNamePattern>
-            <!-- 최대 파일 크기(예: 10MB) -->
             <maxFileSize>10MB</maxFileSize>
-            <!-- 남길 보관 파일 개수 -->
             <maxHistory>30</maxHistory>
-            <!-- 로그 파일 압축 여부 -->
             <cleanHistoryOnStart>true</cleanHistoryOnStart>
         </rollingPolicy>
         <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
@@ -22,24 +15,19 @@
         </encoder>
     </appender>
 
-    <!-- GAME_SIFT appender: SiftingAppender 분기를 이용해 MDC의 gameLogFile 값에 따라 로그 파일을 동적으로 생성 -->
+    <!-- 게임 로그 분기 -->
     <appender name="GAME_SIFT" class="ch.qos.logback.classic.sift.SiftingAppender">
         <discriminator class="ch.qos.logback.classic.sift.MDCBasedDiscriminator">
             <Key>gameLogFile</Key>
-            <!-- MDC에 해당 키가 없으면 기본값 "default" 사용 -->
             <DefaultValue>default</DefaultValue>
         </discriminator>
         <sift>
             <appender name="GAME_LOG-${gameLogFile}" class="ch.qos.logback.core.rolling.RollingFileAppender">
                 <file>logs/game_${gameLogFile}.log</file>
                 <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-                    <!-- 날짜/인덱스 패턴 -->
-                    <fileNamePattern>logs/system_${startupTimestamp}_%d{yyyy-MM-dd}.%i.log</fileNamePattern>
-                    <!-- 최대 파일 크기(예: 10MB) -->
+                    <fileNamePattern>logs/game_${gameLogFile}_%d{yyyy-MM-dd}.%i.log</fileNamePattern>
                     <maxFileSize>10MB</maxFileSize>
-                    <!-- 남길 보관 파일 개수 -->
                     <maxHistory>30</maxHistory>
-                    <!-- 로그 파일 압축 여부 -->
                     <cleanHistoryOnStart>true</cleanHistoryOnStart>
                 </rollingPolicy>
                 <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
@@ -49,14 +37,11 @@
         </sift>
     </appender>
 
-    <!-- Root logger: 기본 시스템 로그 및 콘솔 출력 -->
     <root level="INFO">
         <appender-ref ref="SYSTEM_LOG"/>
     </root>
 
-    <!-- gameLog logger: 게임 관련 로그를 SiftingAppender(GAME_SIFT)로 출력 -->
     <logger name="gameLog" level="INFO" additivity="false">
         <appender-ref ref="GAME_SIFT"/>
     </logger>
-
 </configuration>
