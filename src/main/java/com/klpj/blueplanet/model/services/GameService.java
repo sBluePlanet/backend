@@ -5,6 +5,8 @@ import com.klpj.blueplanet.model.dao.*;
 import com.klpj.blueplanet.model.dto.*;
 import com.klpj.blueplanet.model.responses.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -34,6 +36,14 @@ public class GameService {
     @Autowired
     private KeywordService keywordService;
 
+    @Autowired
+    private SpecialEventDao specialEventDao;
+
+    @Autowired
+    private SpecialEventConditionDao specialEventConditionDao;
+
+    private List<SpecialEventCondition> cachedConditions; // 특별 이벤트 조건들을 미리 캐싱해두기 위한 변수
+
     private Random random = new Random();
 
     /**
@@ -57,6 +67,77 @@ public class GameService {
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("No prologue found."));
         return new StartGameResponse(savedStatus, prologue, 1);
+    }
+
+    // 모든 특별 이벤트 발동 조건 미리 메모리에 로딩
+    @Bean
+    public ApplicationRunner loadSpecialEventConditionsAfterStartup() {
+        return args -> {
+            cachedConditions = specialEventConditionDao.findAll();
+            System.out.println("✅ 캐싱된 조건 수: " + cachedConditions.size());
+        };
+    }
+
+    public List<SpecialEvent> getTriggeredSpecialEvents(UserStatus status) {
+        // 1. 조건들을 이벤트 ID 기준으로 그룹핑 (Map<special_event_id, 조건리스트>)
+        Map<Long, List<SpecialEventCondition>> groupedConditions = cachedConditions.stream()
+                .collect(Collectors.groupingBy(cond -> cond.getSpecialEvent().getId()));
+
+        // 2. 조건을 모두 만족하는 이벤트 ID 추출
+        List<Long> satisfiedEventIds = groupedConditions.entrySet().stream()
+                .filter(entry -> allConditionsMatch(entry.getValue(), status))
+                .map(Map.Entry::getKey)
+                .filter(eventId -> !status.getUsedSpecialEventIds().contains(eventId))
+                .collect(Collectors.toList());
+
+        // 3. DB에서 해당 이벤트들 조회
+        return specialEventDao.findAllById(satisfiedEventIds);
+    }
+
+    private boolean allConditionsMatch(List<SpecialEventCondition> conditions, UserStatus status) {
+        return conditions.stream().allMatch(cond -> {
+            int currentValue = switch (cond.getStatusType().toLowerCase().trim()) {
+                case "air" -> status.getAir();
+                case "water" -> status.getWater();
+                case "biology" -> status.getBiology(); // 혼용 대비
+                case "popularity" -> status.getPopularity();
+                default -> 0;
+            };
+
+            return switch (cond.getOperator().trim()) {
+                case ">" -> currentValue > cond.getVariation();
+                case ">=" -> currentValue >= cond.getVariation();
+                case "<" -> currentValue < cond.getVariation();
+                case "<=" -> currentValue <= cond.getVariation();
+                case "==" -> currentValue == cond.getVariation();
+                default -> false;
+            };
+        });
+    }
+
+    // 조건을 만족하는 특별 이벤트 가져오는 메서드
+    public SpecialEventResponse triggerSpecialEventIfAny(Long userId) {
+        UserStatus userStatus = userStatusDao.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        List<SpecialEvent> triggered = getTriggeredSpecialEvents(userStatus);
+        if (triggered.isEmpty()) {
+            throw new RuntimeException("No special event triggered.");
+        }
+
+        SpecialEvent event = triggered.get(0); // 하나만 처리
+
+        // 수치 반영 (turnCount는 변경 ❌)
+        userStatus.setAir(userStatus.getAir() + event.getAirImpact());
+        userStatus.setWater(userStatus.getWater() + event.getWaterImpact());
+        userStatus.setBiology(userStatus.getBiology() + event.getBiologyImpact());
+        userStatus.setPopularity(userStatus.getPopularity() + event.getPopularityImpact());
+
+        userStatus.getUsedSpecialEventIds().add(event.getId());
+        userStatusDao.save(userStatus);
+
+        int nextEvent = determineNextEventType(userStatus);
+        return new SpecialEventResponse(event, userStatus, nextEvent);
     }
 
     /**
@@ -160,35 +241,60 @@ public class GameService {
         // 4. 업데이트된 상태 저장
         UserStatus updatedStatus = userStatusDao.save(userStatus);
 
-        // 5. 엔딩 조건 판단 및 엔딩 ID 결정 (기본값 0: 정상 진행, 1~10: 엔딩)
-        int endingId = 0; // 초기값 0: 엔딩 조건 미충족
-        if (updatedStatus.getAir() >= 100) {
-            endingId = 1; // air high
-        } else if (updatedStatus.getAir() <= 0) {
-            endingId = 2; // air low
-        } else if (updatedStatus.getWater() >= 100) {
-            endingId = 3; // water high
-        } else if (updatedStatus.getWater() <= 0) {
-            endingId = 4; // water low
-        } else if (updatedStatus.getBiology() >= 100) {
-            endingId = 5; // biology high
-        } else if (updatedStatus.getBiology() <= 0) {
-            endingId = 6; // biology low
-        } else if (updatedStatus.getPopularity() >= 100) {
-            endingId = 7; // popularity high
-        } else if (updatedStatus.getPopularity() <= 0) {
-            endingId = 8; // popularity low
-        } else if (updatedStatus.getTurnCount() >= 20) {
-            // 20턴 이상인 경우 추가 조건: 네 수치의 평균에 따라 엔딩 판별
-            int sum = updatedStatus.getAir() + updatedStatus.getWater() + updatedStatus.getBiology() + updatedStatus.getPopularity();
+        // 다음 이벤트 타입 판단
+        int nextEventType = determineNextEventType(updatedStatus);
+
+        return new GameUpdateResponse(updatedStatus, choice.getResult(), nextEventType);
+
+
+    }
+
+    // 다음 이벤트 판별하는 메서드
+    public int determineNextEventType(UserStatus userStatus) {
+        // 1. 엔딩 조건
+        if (userStatus.getAir() >= 100) return 3;
+        if (userStatus.getAir() <= 0) return 3;
+        if (userStatus.getWater() >= 100) return 3;
+        if (userStatus.getWater() <= 0) return 3;
+        if (userStatus.getBiology() >= 100) return 3;
+        if (userStatus.getBiology() <= 0) return 3;
+        if (userStatus.getPopularity() >= 100) return 3;
+        if (userStatus.getPopularity() <= 0) return 3;
+
+        if (userStatus.getTurnCount() >= 20) {
+            int sum = userStatus.getAir() + userStatus.getWater() +
+                    userStatus.getBiology() + userStatus.getPopularity();
             int average = sum / 4;
-            if (average >= 50) {
-                endingId = 9;
-            } else {
-                endingId = 10;
-            }
+            return 3; // 엔딩으로 이동 (엔딩 ID는 따로 판단할 수 있음)
         }
-        return new GameUpdateResponse(updatedStatus, endingId);
+
+        // 2. 특별 이벤트 조건
+        if (!getTriggeredSpecialEvents(userStatus).isEmpty()) {
+            return 2;
+        }
+
+        // 3. 상시 이벤트
+        return 1;
+    }
+
+    // 어떤 엔딩이벤트를 반환해야하는지 판단하는 메서드
+    public int determineEndingId(UserStatus userStatus) {
+        if (userStatus.getAir() <= 0) return 1;
+        if (userStatus.getAir() >= 100) return 2;
+        if (userStatus.getWater() <= 0) return 3;
+        if (userStatus.getWater() >= 100) return 4;
+        if (userStatus.getBiology() <= 0 ) return 5;
+        if (userStatus.getBiology() >= 100) return 6;
+        if (userStatus.getPopularity() <= 0) return 7;
+        if (userStatus.getPopularity() >= 100) return 8;
+
+        if (userStatus.getTurnCount() >= 20) {
+            int sum = userStatus.getAir() + userStatus.getWater() +
+                    userStatus.getBiology() + userStatus.getPopularity();
+            int average = sum / 4;
+            return (average >= 50) ? 9 : 10;
+        }
+        return 0; // 0이면 엔딩 조건 미충족
     }
 
     /**

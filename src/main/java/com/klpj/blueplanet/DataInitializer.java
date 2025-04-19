@@ -83,7 +83,8 @@ public class DataInitializer {
                 c.setWaterImpact((int) row.getCell(3).getNumericCellValue());
                 c.setBiologyImpact((int) row.getCell(4).getNumericCellValue());
                 c.setPopularityImpact((int) row.getCell(5).getNumericCellValue());
-                c.setContent(row.getCell(6).getStringCellValue());
+                c.setResult(row.getCell(6).getStringCellValue());
+                c.setContent(row.getCell(7).getStringCellValue());
                 choiceDao.save(c);
                 System.out.println("✅ Choice 성공");
             }
@@ -144,7 +145,7 @@ public class DataInitializer {
                 s.setImgUrl(row.getCell(3).getStringCellValue());
                 s.setAirImpact((int) row.getCell(4).getNumericCellValue());
                 s.setWaterImpact((int) row.getCell(5).getNumericCellValue());
-                s.setEcologyImpact((int) row.getCell(6).getNumericCellValue());
+                s.setBiologyImpact((int) row.getCell(6).getNumericCellValue());
                 s.setPopularityImpact((int) row.getCell(7).getNumericCellValue());
 
                 specialEventDao.save(s);

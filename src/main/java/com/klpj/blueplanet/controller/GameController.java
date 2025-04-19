@@ -1,10 +1,13 @@
 package com.klpj.blueplanet.controller;
 
 import com.klpj.blueplanet.model.dao.EndingDao;
+import com.klpj.blueplanet.model.dao.UserStatusDao;
 import com.klpj.blueplanet.model.dto.Ending;
+import com.klpj.blueplanet.model.dto.UserStatus;
 import com.klpj.blueplanet.model.requests.ChoiceRequest;
 import com.klpj.blueplanet.model.responses.GameUpdateResponse;
 import com.klpj.blueplanet.model.responses.NextEventResponse;
+import com.klpj.blueplanet.model.responses.SpecialEventResponse;
 import com.klpj.blueplanet.model.responses.StartGameResponse;
 import com.klpj.blueplanet.model.services.GameService;
 import org.slf4j.Logger;
@@ -19,13 +22,13 @@ import java.util.Date;
 
 /**
  * GameController는 게임 진행에 필요한 엔드포인트를 제공합니다.
- * - /api/game/start: 게임 시작 시, 초기 게임 상태와 프롤로그를 반환하며, 게임 로그 식별자를 MDC에 설정합니다.
- * - /api/game/next: 상시 이벤트(일반 이벤트)를 랜덤으로 조회하여 반환 (요청 시 게임 로그 식별자 전달)
- * - /api/game/choice: 선택지를 처리하여 게임 상태를 업데이트한 후 로그를 남깁니다.
- * - /api/game/ending: 저장된 엔딩 중 하나를 조회하며 로그에 기록합니다.
+ * - /game/start: 게임 시작 시, 초기 게임 상태와 프롤로그를 반환하며, 게임 로그 식별자를 MDC에 설정합니다.
+ * - /game/common: 상시 이벤트(일반 이벤트)를 랜덤으로 조회하여 반환 (요청 시 게임 로그 식별자 전달)
+ * - /game/choice: 선택지를 처리하여 게임 상태를 업데이트한 후 로그를 남깁니다.
+ * - /game/ending: 저장된 엔딩 중 하나를 조회하며 로그에 기록합니다.
  */
 @RestController
-@RequestMapping("/api/game")
+@RequestMapping("/game")
 public class GameController {
 
     // gameLog 전용 로거 (logback-spring.xml의 SiftingAppender 기반 로그)
@@ -36,6 +39,9 @@ public class GameController {
 
     @Autowired
     private EndingDao endingDao;
+
+    @Autowired
+    private UserStatusDao userStatusDao;
 
     /**
      * 게임 시작 시 고유한 로그 식별자를 생성하고 MDC에 설정합니다.
@@ -58,10 +64,10 @@ public class GameController {
     }
 
     /**
-     * /next 엔드포인트는 클라이언트에서 gameLogFile 식별자를 쿼리 파라미터 혹은 헤더로 함께 전송한다고 가정합니다.
+     * /common 엔드포인트는 클라이언트에서 gameLogFile 식별자를 쿼리 파라미터 혹은 헤더로 함께 전송한다고 가정합니다.
      * 여기서 MDC를 재설정하여 해당 게임 세션의 로그 파일에 기록되도록 합니다.
      */
-    @GetMapping("/next")
+    @GetMapping("/common")
     public ResponseEntity<NextEventResponse> getNextEvent(
             @RequestParam("userId") Long userId,
             @RequestParam(value = "gameLogFile", required = false) String gameLogFile) {
@@ -99,21 +105,49 @@ public class GameController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/special")
+    public ResponseEntity<SpecialEventResponse> triggerSpecialEvent(@RequestParam("userId") Long userId) {
+        try {
+            SpecialEventResponse response = gameService.triggerSpecialEventIfAny(userId);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.noContent().build(); // 조건 미충족 시 204 반환
+        }
+    }
+
+
     /**
      * /ending 엔드포인트 역시 gameLogFile 식별자를 이용하여 MDC를 설정합니다.
      */
     @GetMapping("/ending")
-    public ResponseEntity<Ending> getEnding(
-            @RequestParam("endingId") int endingId,
+    public ResponseEntity<Ending> getEndingEvent(
+            @RequestParam("userId") Long userId,
             @RequestParam(value = "gameLogFile", required = false) String gameLogFile) {
         if (gameLogFile != null && !gameLogFile.isEmpty()) {
             MDC.put("gameLogFile", gameLogFile);
         }
 
-        gameLogger.info("Ending requested with id {}.", endingId);
+        // 1. 사용자 상태 조회
+        UserStatus userStatus = userStatusDao.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
 
+        // 2. 엔딩 조건 판단
+        int endingId = gameService.determineEndingId(userStatus);
+
+        if (endingId == 0) {
+            gameLogger.warn("User {} does not meet any ending condition. Skipping ending event.", userId);
+            return ResponseEntity.noContent().build(); // or throw error
+        }
+
+        // 3. 엔딩 데이터 조회
         Ending ending = endingDao.findById((long) endingId)
                 .orElseThrow(() -> new RuntimeException("Ending not found with id: " + endingId));
+
+        // 4. 로깅
+        gameLogger.info("User {} triggered ending {}: {}",
+                userId, ending.getId(), ending.getTitle());
+
+        // 5. 응답 반환
         return ResponseEntity.ok(ending);
     }
 }
