@@ -32,15 +32,14 @@ public class GameService {
     @Autowired
     private ChoiceDao choiceDao;
 
-    // KeywordService를 통해 tooltip 정보 추출 (미리 구현했다고 가정)
-    @Autowired
-    private KeywordService keywordService;
-
     @Autowired
     private SpecialEventDao specialEventDao;
 
     @Autowired
     private SpecialEventConditionDao specialEventConditionDao;
+
+    @Autowired
+    private UserChoiceHistoryDao userChoiceHistoryDao;
 
     private List<SpecialEventCondition> cachedConditions; // 특별 이벤트 조건들을 미리 캐싱해두기 위한 변수
 
@@ -78,6 +77,7 @@ public class GameService {
         };
     }
 
+
     public List<SpecialEvent> getTriggeredSpecialEvents(UserStatus status) {
         // 1. 조건들을 이벤트 ID 기준으로 그룹핑 (Map<special_event_id, 조건리스트>)
         Map<Long, List<SpecialEventCondition>> groupedConditions = cachedConditions.stream()
@@ -89,6 +89,7 @@ public class GameService {
                 .map(Map.Entry::getKey)
                 .filter(eventId -> !status.getUsedSpecialEventIds().contains(eventId))
                 .collect(Collectors.toList());
+
 
         // 3. DB에서 해당 이벤트들 조회
         return specialEventDao.findAllById(satisfiedEventIds);
@@ -115,6 +116,7 @@ public class GameService {
         });
     }
 
+
     // 조건을 만족하는 특별 이벤트 가져오는 메서드
     public SpecialEventResponse triggerSpecialEventIfAny(Long userId) {
         UserStatus userStatus = userStatusDao.findById(userId)
@@ -140,9 +142,10 @@ public class GameService {
         return new SpecialEventResponse(event, userStatus, nextEvent);
     }
 
+
     /**
      * 사용자의 userId를 기반으로, 아직 제공되지 않은 이벤트 중 하나를 랜덤으로 선택한 후,
-     * 해당 이벤트 정보와 이벤트 content 내 tooltip 키워드 및 선택지(단순하게 id와 content만)를 포함한 NextEventResponse를 반환합니다.
+     * 해당 이벤트 정보를 포함한 NextEventResponse를 반환합니다.
      *
      * @param userId 사용자의 ID (쿼리 파라미터로 전달)
      * @return NextEventResponse DTO
@@ -177,14 +180,6 @@ public class GameService {
                 selectedEvent.getWriter()
         );
 
-        // 툴팁 추출: KeywordService를 통해 이벤트 content 내의 키워드와 관련 툴팁 정보를 추출
-        // 여기서 extractTooltips()는 Map<String, String> 타입의 결과를 반환한다고 가정합니다.
-        Map<String, String> tooltipMap = keywordService.extractTooltips(selectedEvent.getContent());
-        List<TooltipResponse> tooltipResponses = tooltipMap.entrySet()
-                .stream()
-                .map(entry -> new TooltipResponse(entry.getKey(), entry.getValue()))
-                .collect(Collectors.toList());
-
         // 선택지 단순화: Choice를 ChoiceSimpleResponse로 매핑 (id와 text만)
         List<ChoiceSimpleResponse> choiceResponses = selectedEvent.getChoices()
                 .stream()
@@ -192,34 +187,33 @@ public class GameService {
                 .collect(Collectors.toList());
 
         // NextEventResponse를 생성하여 반환 (턴 수나 nextEvent 값은 FE에서 로직으로 결정)
-        NextEventResponse nextEventResponse = new NextEventResponse(eventResponse, tooltipResponses, choiceResponses);
-        return nextEventResponse;
+        return new NextEventResponse(eventResponse, choiceResponses);
     }
 
     /**
      * 사용자의 userStatusId와 선택된 choiceId를 기반으로 게임 상태를 업데이트하고,
      * 엔딩 조건을 판단하여 엔딩 ID(1~10)를 결정한 후,
      * GameUpdateResponse DTO로 업데이트된 UserStatus와 엔딩 ID를 반환합니다.
-     *
+     * <p>
      * 엔딩 조건:
      * - 어느 한 수치 (air, water, biology, popularity)가 100 이상이거나 0 이하인 경우:
-     *      * air high → endingId = 1
-     *      * air low  → endingId = 2
-     *      * water high → endingId = 3
-     *      * water low  → endingId = 4
-     *      * biology high → endingId = 5
-     *      * biology low  → endingId = 6
-     *      * popularity high → endingId = 7
-     *      * popularity low  → endingId = 8
-     *
+     * * air high → endingId = 1
+     * * air low  → endingId = 2
+     * * water high → endingId = 3
+     * * water low  → endingId = 4
+     * * biology high → endingId = 5
+     * * biology low  → endingId = 6
+     * * popularity high → endingId = 7
+     * * popularity low  → endingId = 8
+     * <p>
      * - 만약 위 조건에 해당하지 않고, turnCount가 20 이상일 경우:
-     *      * 네 수치의 평균이 50 이상이면 → endingId = 9
-     *      * 네 수치의 평균이 50 미만이면  → endingId = 10
-     *
+     * * 네 수치의 평균이 50 이상이면 → endingId = 9
+     * * 네 수치의 평균이 50 미만이면  → endingId = 10
+     * <p>
      * - 조건을 충족하지 않으면 endingId는 0 (정상 진행)입니다.
      *
      * @param userStatusId 사용자 상태의 ID
-     * @param choiceId 선택된 선택지의 ID
+     * @param choiceId     선택된 선택지의 ID
      * @return GameUpdateResponse DTO (업데이트된 UserStatus와 결정된 endingId)
      */
     public GameUpdateResponse processChoice(Long userStatusId, Long choiceId) {
@@ -241,12 +235,20 @@ public class GameService {
         // 4. 업데이트된 상태 저장
         UserStatus updatedStatus = userStatusDao.save(userStatus);
 
+        // 5. 선택 이력 기록 (새로 추가된 부분)
+        // 선택한 이벤트의 ID는 선택지(choice)가 속한 이벤트의 ID를 통해 확인할 수 있습니다.
+        UserChoiceHistory history = new UserChoiceHistory();
+        history.setUserStatusId(userStatusId);
+        history.setEventId(choice.getEvent().getId());
+        history.setChoiceId(choiceId);
+        // history.setChosenAt(new Date()); // 기본값 생성자로 이미 현재 시각이 할당됨
+
+        userChoiceHistoryDao.save(history);  // UserChoiceHistoryDao를 주입 받아 사용합니다.
+
         // 다음 이벤트 타입 판단
         int nextEventType = determineNextEventType(updatedStatus);
 
         return new GameUpdateResponse(updatedStatus, choice.getResult(), nextEventType);
-
-
     }
 
     // 다음 이벤트 판별하는 메서드
@@ -283,7 +285,7 @@ public class GameService {
         if (userStatus.getAir() >= 100) return 2;
         if (userStatus.getWater() <= 0) return 3;
         if (userStatus.getWater() >= 100) return 4;
-        if (userStatus.getBiology() <= 0 ) return 5;
+        if (userStatus.getBiology() <= 0) return 5;
         if (userStatus.getBiology() >= 100) return 6;
         if (userStatus.getPopularity() <= 0) return 7;
         if (userStatus.getPopularity() >= 100) return 8;
@@ -294,8 +296,10 @@ public class GameService {
             int average = sum / 4;
             return (average >= 50) ? 9 : 10;
         }
+
         return 0; // 0이면 엔딩 조건 미충족
     }
+
 
     /**
      * DB에서 저장된 엔딩 중 하나를 랜덤으로 선택하여 반환합니다.
