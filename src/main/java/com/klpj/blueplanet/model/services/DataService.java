@@ -91,48 +91,52 @@ public class DataService {
      * 사용자(userId)와 이벤트(eventId)를 받아 해당 이메일(이벤트) 상세 정보를 반환합니다.
      * 추가로, 사용자가 해당 이벤트에서 선택했던 선택지 정보가 있으면 함께 포함합니다.
      */
-    public EmailDetailResponse getEmailDetail(Long userId, Long id) {
-        // 1. 먼저 AdviceEmail로 시도
-        Optional<AdviceEmail> maybeAdvice = adviceEmailDao.findById(id);
-        if (maybeAdvice.isPresent()) {
-            AdviceEmail a = maybeAdvice.get();
+    public EmailDetailResponse getEmailDetail(Long userId, Long id, String type) {
+        if (type.equals("advice")) {
+            // 조언 메일 상세 조회
+            AdviceEmail advice = adviceEmailDao.findById(id)
+                    .orElseThrow(() -> new RuntimeException("조언 메일을 찾을 수 없습니다."));
             return new EmailDetailResponse(
-                    a.getId(),
-                    a.getTitle(),
-                    "과학자 박병호",
-                    a.getContent(),
-                    List.of(),
+                    advice.getEventId(),
+                    advice.getTitle(),
+                    "과학자 박병호", // 또는 "AI 조언"
+                    advice.getContent(),
+                    List.of(), // 선택지 없음
                     null
+            );
+        } else if (type.equals("event")) {
+            // 일반 이벤트 메일 상세 조회
+            Event event = eventDao.findById(id)
+                    .orElseThrow(() -> new RuntimeException("이벤트를 찾을 수 없습니다."));
+
+            List<ChoiceSimpleResponse> choices = event.getChoices()
+                    .stream()
+                    .map(c -> new ChoiceSimpleResponse(c.getId(), c.getContent()))
+                    .collect(Collectors.toList());
+
+            List<UserChoiceHistory> histories = userChoiceHistoryDao.findByUserStatusIdAndEventId(userId, id);
+
+            ChoiceSimpleResponse selectedChoice = null;
+            if (!histories.isEmpty()) {
+                UserChoiceHistory history = histories.get(0);
+                Choice choice = choiceDao.findById(history.getChoiceId()).orElse(null);
+                if (choice != null) {
+                    selectedChoice = new ChoiceSimpleResponse(choice.getId(), choice.getContent());
+                }
+            }
+
+            return new EmailDetailResponse(
+                    event.getId(),
+                    event.getTitle(),
+                    event.getWriter(),
+                    event.getContent(),
+                    choices,
+                    selectedChoice
             );
         }
 
-        // 2. 없으면 Event로 간주
-        Event event = eventDao.findById(id)
-                .orElseThrow(() -> new RuntimeException("이벤트 또는 조언 메일을 찾을 수 없습니다."));
-
-        List<ChoiceSimpleResponse> choices = event.getChoices()
-                .stream()
-                .map(c -> new ChoiceSimpleResponse(c.getId(), c.getContent()))
-                .collect(Collectors.toList());
-
-        List<UserChoiceHistory> histories = userChoiceHistoryDao.findByUserStatusIdAndEventId(userId, id);
-        ChoiceSimpleResponse selectedChoice = null;
-        if (!histories.isEmpty()) {
-            UserChoiceHistory history = histories.get(0);
-            Choice choice = choiceDao.findById(history.getChoiceId()).orElse(null);
-            if (choice != null) {
-                selectedChoice = new ChoiceSimpleResponse(choice.getId(), choice.getContent());
-            }
-        }
-
-        return new EmailDetailResponse(
-                event.getId(),
-                event.getTitle(),
-                event.getWriter(),
-                event.getContent(),
-                choices,
-                selectedChoice
-        );
+        // 그 외 타입이면 예외 처리
+        throw new IllegalArgumentException("알 수 없는 type: " + type);
     }
 
     /**

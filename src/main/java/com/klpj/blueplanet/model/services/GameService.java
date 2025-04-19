@@ -319,6 +319,9 @@ public class GameService {
     public String summarizeUserFlow(Long userId) {
         List<UserChoiceHistory> historyList = userChoiceHistoryDao.findByUserStatusIdOrderByChosenAtAsc(userId);
 
+        UserStatus status = userStatusDao.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
         StringBuilder sb = new StringBuilder();
         sb.append(
                 "당신은 게임의 스토리텔러입니다. 아래 선택 내용을 기반으로 두 가지를 작성해주세요:\n\n" +
@@ -331,11 +334,13 @@ public class GameService {
                         "      \"당신은 창의적이고 책임감 있는 사람입니다.\" ← ❌ 금지\n" +
                         "항상 긍정적으로 대답할 필요는 없습니다.\n" +
                         "부정적인 방향으로 플레이했을 경우, 부정적인 표현을 사용해야 합니다.\n" +
-                        "예를 들면, 특정 수치가 0 이하에 도달한 엔딩이거나, 모든 수치의 평균치가 50 미만인 엔딩인 경우입니다.\n" +
-                        "- 예: \"당신은 이기주의적인 사람입니다. \"\n" +
+                        "예를 들면, 특정 수치가 0 이하에 도달한 엔딩이거나, 모든 수치의 평균치가 50 미만인 엔딩인 경우가 있을 수 있습니다.\n" +
+                        "혹은, air 등의 수치가 50 이상으로 높더라도, water 등의 수치가 50 미만으로 낮다면,\n" +
+                        "대기에는 ㅁㅁ한 좋은 영향을 미쳤으나, 수질에는 ㅇㅇ한 안좋은 영향을 미쳤습니다, 와 같이 수치별로 나눠서 생각할 수 있습니다.\n" +
                         "하지만, 부정적으로 답변하더라도 개선 방안이 제시되어야 합니다.\n" +
                         "즉, 일방적으로 비난하는 방면의 부정적 답변은 금지합니다.\n" +
-                        "어느 정도가 긍정적인 플레이인지 부정적인 플레이인지의 판단은 맡기겠습니다.\n"+
+                        "어느 정도가 긍정적인 플레이인지 부정적인 플레이인지의 판단은 맡기겠습니다.\n" +
+                        "현재 사용자 상태와, 사용자가 지금껏 선택한 선택지를 잘 참고하여 답변해주시기 바랍니다.\n"+
                         "2. 플레이어의 선택을 바탕으로 몰입이 가능한 엔딩 장면처럼 분석된 문단을 작성해주세요.\n" +
                         "- 분량: 250자 이상 300자 이하\n" +
                         "- 반드시 서론 없이 **본론부터 시작**하세요.\n" +
@@ -359,6 +364,12 @@ public class GameService {
                         "2. [바로 본론 시작, 서론 없이, 전부 존댓말로]\n\n"+
                         "- 💥 위 조건을 어길 경우 잘못된 응답으로 간주됩니다. 반드시 지침을 철저히 지켜서 작성해주세요."
         );
+
+        sb.append("【현재 사용자 상태】\n")
+                .append("대기: ").append(status.getAir()).append(", ")
+                .append("수질: ").append(status.getWater()).append(", ")
+                .append("생물: ").append(status.getBiology()).append(", ")
+                .append("지지도: ").append(status.getPopularity()).append("\n\n");
 
         sb.append("사용자 ").append(userId).append("의 선택 이력 :\n\n");
 
