@@ -13,8 +13,10 @@ public interface AdviceEmailDao extends JpaRepository<AdviceEmail, Long> {
     List<AdviceEmail> findByUserId(Long userId);
 
     // 특정 유저가 특정 이벤트에 대해 요청한 모든 조언
-    List<AdviceEmail> findByUserIdAndEventId(Long userId, Long eventId);
+    Optional<AdviceEmail> findTopByUserIdAndEventIdOrderByCreatedAtDesc(Long userId, Long eventId);
 
     // 최신 순으로 정렬
     List<AdviceEmail> findByUserIdOrderByCreatedAtDesc(Long userId);
+
+
 }
