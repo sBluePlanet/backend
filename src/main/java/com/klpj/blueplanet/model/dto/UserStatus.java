@@ -23,6 +23,7 @@ public class UserStatus {
     private int popularity; // 지지도
 
     // 게임 진행 턴
+    @Column(name = "turn_count")
     private int turnCount;
 
     // 사용된 이벤트 ID를 저장

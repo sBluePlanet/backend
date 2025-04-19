@@ -1,100 +1,186 @@
 package com.klpj.blueplanet;
 
 
-import com.klpj.blueplanet.model.dao.EventDao;
+import com.klpj.blueplanet.model.dao.*;
 import com.klpj.blueplanet.model.dto.*;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
+import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.springframework.boot.CommandLineRunner;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.stereotype.Component;
 
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
 
-@Configuration 
+@Component
+@RequiredArgsConstructor
 public class DataInitializer {
 
-    @Bean
-    public CommandLineRunner initData(EventDao eventDao) {
-        return args -> {
-            // 엑셀 파일을 클래스패스(예: src/main/resources)에 위치시킵니다.
-            try (InputStream is = getClass().getResourceAsStream("/events/data/EventData.xlsx");
-                 Workbook workbook = new XSSFWorkbook(Objects.requireNonNull(is))) { // XSSFWorkbook: .xlsx 파일 형식을 처리합니다.
+    private final EventDao eventDao;
+    private final ChoiceDao choiceDao;
+    private final EndingDao endingDao;
+    private final TooltipDao tooltipDao;
+    private final SpecialEventDao specialEventDao;
+    private final SpecialEventConditionDao specialEventConditionDao;
+    private final PrologueDao prologueDao; // 추가된 PrologueDao
 
-                Sheet sheet = workbook.getSheetAt(0); // 첫 번째 시트를 사용합니다.
-                boolean firstRow = true;  // 첫 번째 행은 헤더라고 가정
-                // 이벤트 제목을 키로 하여, 같은 제목의 이벤트를 재활용할 수 있도록 Map으로 관리합니다.
-                Map<String, Event> eventMap = new HashMap<>();
+    @PostConstruct
+    public void init() {
+        if (eventDao.count() == 0) {
+            // Prologue 데이터 초기화 추가
+            initPrologue();
+            initEvents();
+            initChoices();
+            initEndings();
+            initTooltips();
+            initSpecialEvents();
+            initSpecialEventConditions();
+            System.out.println("불변 데이터 삽입 완료!");
+        } else {
+            System.out.println("데이터 이미 존재 — 초기화 생략됨");
+        }
+    }
 
-                // 시트의 모든 행(row)을 순회합니다.
-                for (Row row : sheet) {
-                    // 첫 번째 행(헤더 행)은 건너뜁니다.
-                    if (firstRow) {
-                        firstRow = false;
-                        continue;
-                    }
+    // Prologue 초기화 (하드코딩 방식)
+    private void initPrologue() {
+        Prologue prologue = new Prologue();
+        prologue.setTitle("게임 시작");
+        prologue.setContent("환경 문제에 대한 여정을 시작합니다. 여러 이벤트를 통해 환경에 긍정적인 변화를 가져오는 선택을 하게 될 것입니다.");
+        prologueDao.save(prologue);
+        System.out.println("✅ Prologue 성공");
+    }
 
-                    // 각 셀의 데이터를 읽습니다.
-                    // 컬럼 순서: 0: Event Title, 1: Event Content, 2: Choice Text,
-                    // 3: Air Impact, 4: Water Impact, 5: Biology Impact, 6: Popularity Impact
-                    Cell eventTitleCell = row.getCell(0);
-                    Cell eventContentCell = row.getCell(1);
-                    Cell choiceTextCell = row.getCell(2);
-                    Cell airImpactCell = row.getCell(3);
-                    Cell waterImpactCell = row.getCell(4);
-                    Cell biologyImpactCell = row.getCell(5);
-                    Cell popularityImpactCell = row.getCell(6);
+    private void initEvents() {
+        try (InputStream is = getClass().getResourceAsStream("/test.data/Event_test.xlsx");
+             Workbook wb = new XSSFWorkbook(is)) {
+            Sheet sheet = wb.getSheetAt(0);
+            for (Row row : sheet) {
+                if (row.getRowNum() == 0) continue;
+                Event e = new Event();
+                e.setTitle(row.getCell(1).getStringCellValue());
+                e.setWriter(row.getCell(2).getStringCellValue());
+                e.setContent(row.getCell(3).getStringCellValue());
+                eventDao.save(e);
+                System.out.println("✅ Event 성공");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
-                    // String 형태의 값 읽기 (null 체크는 필요 시 추가)
-                    String eventTitle = eventTitleCell.getStringCellValue();
-                    String eventContent = eventContentCell.getStringCellValue();
-                    String choiceText = choiceTextCell.getStringCellValue();
+    private void initChoices() {
+        try (InputStream is = getClass().getResourceAsStream("/test.data/Choice_test.xlsx");
+             Workbook wb = new XSSFWorkbook(is)) {
+            Sheet sheet = wb.getSheetAt(0);
+            for (Row row : sheet) {
+                if (row.getRowNum() == 0) continue;
+                long eventId = (long) row.getCell(1).getNumericCellValue();
+                Event event = eventDao.findById(eventId).orElse(null);
+                if (event == null) continue;
 
-                    // 수치 데이터는 Numeric 형으로 읽은 후 int로 변환합니다.
-                    int airImpact = (int) airImpactCell.getNumericCellValue();
-                    int waterImpact = (int) waterImpactCell.getNumericCellValue();
-                    int biologyImpact = (int) biologyImpactCell.getNumericCellValue();
-                    int popularityImpact = (int) popularityImpactCell.getNumericCellValue();
+                Choice c = new Choice();
+                c.setEvent(event);
+                c.setAirImpact((int) row.getCell(2).getNumericCellValue());
+                c.setWaterImpact((int) row.getCell(3).getNumericCellValue());
+                c.setBiologyImpact((int) row.getCell(4).getNumericCellValue());
+                c.setPopularityImpact((int) row.getCell(5).getNumericCellValue());
+                c.setContent(row.getCell(6).getStringCellValue());
+                choiceDao.save(c);
+                System.out.println("✅ Choice 성공");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
-                    // 동일한 이벤트 제목으로 생성된 이벤트가 존재하는지 확인합니다.
-                    Event event = eventMap.get(eventTitle);
-                    if (event == null) {
-                        // 존재하지 않으면 새 이벤트 객체를 생성합니다.
-                        event = new Event();
-                        event.setTitle(eventTitle);
-                        event.setContent(eventContent);
-                        event.setChoices(new ArrayList<>()); // 빈 선택지 리스트 생성
-                        eventMap.put(eventTitle, event);
-                    }
+    private void initEndings() {
+        try (InputStream is = getClass().getResourceAsStream("/test.data/Ending_test.xlsx");
+             Workbook wb = new XSSFWorkbook(is)) {
+            Sheet sheet = wb.getSheetAt(0);
+            for (Row row : sheet) {
+                if (row.getRowNum() == 0) continue;
+                Ending e = new Ending();
+                e.setTitle(row.getCell(1).getStringCellValue());
+                e.setContent(row.getCell(2).getStringCellValue());
+                endingDao.save(e);
+                System.out.println("✅ Ending 성공");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
-                    // 새로운 선택지 객체 생성
-                    Choice choice = new Choice();
-                    choice.setText(choiceText);
-                    choice.setAirImpact(airImpact);
-                    choice.setWaterImpact(waterImpact);
-                    choice.setBiologyImpact(biologyImpact);
-                    choice.setPopularityImpact(popularityImpact);
-                    choice.setEvent(event); // 선택지에 이벤트 객체 연결
+    private void initTooltips() {
+        try (InputStream is = getClass().getResourceAsStream("/test.data/Tooltip_test.xlsx");
+             Workbook workbook = new XSSFWorkbook(is)) {
 
-                    // 이벤트의 선택지 리스트에 선택지를 추가합니다.
-                    event.getChoices().add(choice);
+            Sheet sheet = workbook.getSheetAt(0);
+            for (Row row : sheet) {
+                if (row.getRowNum() == 0) continue;
+
+                Tooltip tooltip = new Tooltip();
+                tooltip.setKeyword(row.getCell(1).getStringCellValue());
+                tooltip.setContent(row.getCell(2).getStringCellValue());
+
+                tooltipDao.save(tooltip);
+                System.out.println("✅ Tooltip 성공");
+            }
+            System.out.println("Tooltip 초기화 완료");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void initSpecialEvents() {
+        try (InputStream is = getClass().getResourceAsStream("/test.data/SpecialEvent_test.xlsx");
+             Workbook wb = new XSSFWorkbook(is)) {
+            Sheet sheet = wb.getSheetAt(0);
+            for (Row row : sheet) {
+                if (row.getRowNum() == 0) continue; // 헤더 스킵
+
+                SpecialEvent s = new SpecialEvent();
+
+                s.setTitle(row.getCell(1).getStringCellValue());
+                s.setContent(row.getCell(2).getStringCellValue());
+                s.setImgUrl(row.getCell(3).getStringCellValue());
+                s.setAirImpact((int) row.getCell(4).getNumericCellValue());
+                s.setWaterImpact((int) row.getCell(5).getNumericCellValue());
+                s.setEcologyImpact((int) row.getCell(6).getNumericCellValue());
+                s.setPopularityImpact((int) row.getCell(7).getNumericCellValue());
+
+                specialEventDao.save(s);
+                System.out.println("✅ SpecialEvent 성공");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void initSpecialEventConditions() {
+        try (InputStream is = getClass().getResourceAsStream("/test.data/SpecialEventCondition_test.xlsx");
+             Workbook wb = new XSSFWorkbook(is)) {
+            Sheet sheet = wb.getSheetAt(0);
+            for (Row row : sheet) {
+                if (row.getRowNum() == 0) continue;
+
+                Long seId = (long) row.getCell(1).getNumericCellValue();
+                SpecialEvent se = specialEventDao.findById(seId).orElse(null);
+                if (se == null) {
+                    System.out.println("SpecialEvent not found for id: " + seId);
+                    continue;
                 }
 
-                // 생성된 모든 이벤트(및 연관된 선택지들)를 DB에 저장합니다.
-                // Cascade 옵션에 따라 선택지도 함께 저장됩니다.
-                eventDao.saveAll(new ArrayList<>(eventMap.values()));
-                System.out.println("엑셀 파일에서 초기 데이터가 DB에 추가되었습니다.");
+                SpecialEventCondition cond = new SpecialEventCondition();
+                cond.setSpecialEvent(se);
+                cond.setStatusType(row.getCell(2).getStringCellValue());
+                cond.setOperator(row.getCell(3).getStringCellValue());
+                cond.setVariation((int) row.getCell(4).getNumericCellValue());
+                cond.setPriority((int) row.getCell(5).getNumericCellValue());
 
-            } catch (Exception e) {
-                e.printStackTrace();
+                specialEventConditionDao.save(cond);
+                System.out.println("✅ SpecialEventCondition 성공");
             }
-        };
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
