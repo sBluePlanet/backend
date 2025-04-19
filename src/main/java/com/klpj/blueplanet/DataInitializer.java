@@ -66,7 +66,7 @@ public class DataInitializer {
     }
 
     private void initEvents() {
-        InputStream is = getClass().getResourceAsStream("/test.data/Event_test.xlsx");
+        InputStream is = getClass().getResourceAsStream("/data/events/Regular_Events.xlsx");
         if (is == null) {
             logger.error("Event_test.xlsx not found");
             return;
@@ -87,7 +87,7 @@ public class DataInitializer {
     }
 
     private void initChoices() {
-        InputStream is = getClass().getResourceAsStream("/test.data/Choice_test.xlsx");
+        InputStream is = getClass().getResourceAsStream("/data/events/Regular_Events_Choices.xlsx");
         if (is == null) {
             logger.error("Choice_test.xlsx not found");
             return;
@@ -115,7 +115,7 @@ public class DataInitializer {
     }
 
     private void initEndings() {
-        InputStream is = getClass().getResourceAsStream("/test.data/Ending_test.xlsx");
+        InputStream is = getClass().getResourceAsStream("/data/endings/Endings.xlsx");
         if (is == null) {
             logger.error("Ending_test.xlsx not found");
             return;
@@ -124,8 +124,8 @@ public class DataInitializer {
             for (Row row : wb.getSheetAt(0)) {
                 if (row.getRowNum() == 0) continue;
                 Ending e = new Ending();
-                e.setTitle(row.getCell(1).getStringCellValue());
-                e.setContent(row.getCell(2).getStringCellValue());
+                e.setTitle(row.getCell(0).getStringCellValue());
+                e.setContent(row.getCell(1).getStringCellValue());
                 endingDao.save(e);
             }
             logger.info("✅ Endings 초기화 완료");
@@ -135,7 +135,7 @@ public class DataInitializer {
     }
 
     private void initTooltips() {
-        InputStream is = getClass().getResourceAsStream("/test.data/Tooltip_test.xlsx");
+        InputStream is = getClass().getResourceAsStream("/data/events/Regular_Events_Keyword.xlsx");
         if (is == null) {
             logger.error("Tooltip_test.xlsx not found");
             return;
@@ -155,7 +155,7 @@ public class DataInitializer {
     }
 
     private void initSpecialEvents() {
-        InputStream is = getClass().getResourceAsStream("/test.data/SpecialEvent_test.xlsx");
+        InputStream is = getClass().getResourceAsStream("/data/special/SpecialEvent_test.xlsx");
         if (is == null) {
             logger.error("SpecialEvent_test.xlsx not found");
             return;
@@ -180,7 +180,7 @@ public class DataInitializer {
     }
 
     private void initSpecialEventConditions() {
-        InputStream is = getClass().getResourceAsStream("/test.data/SpecialEventCondition_test.xlsx");
+        InputStream is = getClass().getResourceAsStream("/data/special/SpecialEventCondition_test.xlsx");
         if (is == null) {
             logger.error("SpecialEventCondition_test.xlsx not found");
             return;
