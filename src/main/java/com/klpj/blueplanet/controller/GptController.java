@@ -1,10 +1,8 @@
 package com.klpj.blueplanet.controller;
 
-import ch.qos.logback.core.encoder.EchoEncoder;
-import com.klpj.blueplanet.model.dao.AdviceEmailDao;
-import com.klpj.blueplanet.model.dto.AdviceEmail;
-import com.klpj.blueplanet.model.services.GameService;
-import com.klpj.blueplanet.model.services.GptService;
+import com.klpj.blueplanet.model.dao.*;
+import com.klpj.blueplanet.model.dto.*;
+import com.klpj.blueplanet.model.services.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,7 +10,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 

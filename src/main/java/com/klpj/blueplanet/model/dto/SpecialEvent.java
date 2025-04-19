@@ -1,10 +1,7 @@
 package com.klpj.blueplanet.model.dto;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 @Entity
 @Table(name = "special_events")
@@ -18,8 +15,10 @@ public class SpecialEvent {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(length = 500)
     private String title;
 
+    @Column(columnDefinition = "TEXT")
     private String content;
 
     @Column(name = "img_url", length = 500)
@@ -36,4 +35,7 @@ public class SpecialEvent {
 
     @Column(name = "popularity_impact")
     private int popularityImpact;
+
+    @Column(name = "priority")
+    private int priority;
 }

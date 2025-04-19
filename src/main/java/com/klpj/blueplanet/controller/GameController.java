@@ -1,15 +1,10 @@
 package com.klpj.blueplanet.controller;
 
-import com.klpj.blueplanet.model.dao.EndingDao;
-import com.klpj.blueplanet.model.dao.UserStatusDao;
-import com.klpj.blueplanet.model.dto.Ending;
-import com.klpj.blueplanet.model.dto.UserStatus;
-import com.klpj.blueplanet.model.requests.ChoiceRequest;
-import com.klpj.blueplanet.model.responses.GameUpdateResponse;
-import com.klpj.blueplanet.model.responses.NextEventResponse;
-import com.klpj.blueplanet.model.responses.SpecialEventResponse;
-import com.klpj.blueplanet.model.responses.StartGameResponse;
-import com.klpj.blueplanet.model.services.GameService;
+import com.klpj.blueplanet.model.dao.*;
+import com.klpj.blueplanet.model.dto.*;
+import com.klpj.blueplanet.model.requests.*;
+import com.klpj.blueplanet.model.responses.*;
+import com.klpj.blueplanet.model.services.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;

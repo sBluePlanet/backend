@@ -1,7 +1,7 @@
 package com.klpj.blueplanet.controller;
 
 import com.klpj.blueplanet.model.responses.*;
-import com.klpj.blueplanet.model.services.DataService;
+import com.klpj.blueplanet.model.services.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
