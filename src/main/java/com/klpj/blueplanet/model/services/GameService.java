@@ -107,7 +107,7 @@ public class GameService {
         // 선택지 단순화: Choice를 ChoiceSimpleResponse로 매핑 (id와 text만)
         List<ChoiceSimpleResponse> choiceResponses = selectedEvent.getChoices()
                 .stream()
-                .map(choice -> new ChoiceSimpleResponse(choice.getId(), choice.getText()))
+                .map(choice -> new ChoiceSimpleResponse(choice.getId(), choice.getContent()))
                 .collect(Collectors.toList());
 
         // NextEventResponse를 생성하여 반환 (턴 수나 nextEvent 값은 FE에서 로직으로 결정)
