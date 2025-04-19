@@ -8,7 +8,7 @@ import lombok.Setter;
 public class ChoiceResponse {
     // Getters and setters ...
     private Long id;
-    private String text;
+    private String content;
     private int airImpact;
     private int waterImpact;
     private int biologyImpact;
@@ -17,9 +17,9 @@ public class ChoiceResponse {
     public ChoiceResponse() {
     }
 
-    public ChoiceResponse(Long id, String text, int airImpact, int waterImpact, int biologyImpact, int popularityImpact) {
+    public ChoiceResponse(Long id, String content, int airImpact, int waterImpact, int biologyImpact, int popularityImpact) {
         this.id = id;
-        this.text = text;
+        this.content = content;
         this.airImpact = airImpact;
         this.waterImpact = waterImpact;
         this.biologyImpact = biologyImpact;
