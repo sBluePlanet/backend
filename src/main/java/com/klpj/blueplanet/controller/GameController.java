@@ -19,13 +19,13 @@ import java.util.Date;
 
 /**
  * GameController는 게임 진행에 필요한 엔드포인트를 제공합니다.
- * - /api/game/start: 게임 시작 시, 초기 게임 상태와 프롤로그를 반환하며, 게임 로그 식별자를 MDC에 설정합니다.
- * - /api/game/next: 상시 이벤트(일반 이벤트)를 랜덤으로 조회하여 반환 (요청 시 게임 로그 식별자 전달)
- * - /api/game/choice: 선택지를 처리하여 게임 상태를 업데이트한 후 로그를 남깁니다.
- * - /api/game/ending: 저장된 엔딩 중 하나를 조회하며 로그에 기록합니다.
+ * - /game/start: 게임 시작 시, 초기 게임 상태와 프롤로그를 반환하며, 게임 로그 식별자를 MDC에 설정합니다.
+ * - /game/common: 상시 이벤트(일반 이벤트)를 랜덤으로 조회하여 반환 (요청 시 게임 로그 식별자 전달)
+ * - /game/choice: 선택지를 처리하여 게임 상태를 업데이트한 후 로그를 남깁니다.
+ * - /game/ending: 저장된 엔딩 중 하나를 조회하며 로그에 기록합니다.
  */
 @RestController
-@RequestMapping("/api/game")
+@RequestMapping("/game")
 public class GameController {
 
     // gameLog 전용 로거 (logback-spring.xml의 SiftingAppender 기반 로그)
@@ -58,10 +58,10 @@ public class GameController {
     }
 
     /**
-     * /next 엔드포인트는 클라이언트에서 gameLogFile 식별자를 쿼리 파라미터 혹은 헤더로 함께 전송한다고 가정합니다.
+     * /common 엔드포인트는 클라이언트에서 gameLogFile 식별자를 쿼리 파라미터 혹은 헤더로 함께 전송한다고 가정합니다.
      * 여기서 MDC를 재설정하여 해당 게임 세션의 로그 파일에 기록되도록 합니다.
      */
-    @GetMapping("/next")
+    @GetMapping("/common")
     public ResponseEntity<NextEventResponse> getNextEvent(
             @RequestParam("userId") Long userId,
             @RequestParam(value = "gameLogFile", required = false) String gameLogFile) {
