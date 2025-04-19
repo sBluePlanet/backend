@@ -15,7 +15,7 @@ public class Choice {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String text;
+    private String content;
 
     // 각 선택지가 미치는 영향 수치들 (예: -15~+15 범위)
     private int airImpact;         // 대기에 미치는 영향
