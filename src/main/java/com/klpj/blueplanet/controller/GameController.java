@@ -43,6 +43,7 @@ public class GameController {
     @Autowired
     private UserStatusDao userStatusDao;
 
+
     /**
      * 게임 시작 시 고유한 로그 식별자를 생성하고 MDC에 설정합니다.
      * 이 식별자는 클라이언트에 전달되어 이후 모든 요청에 포함되어야 합니다.
@@ -85,6 +86,27 @@ public class GameController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/special")
+    public ResponseEntity<SpecialEventResponse> triggerSpecialEvent(
+            @RequestParam("userId") Long userId,
+            @RequestParam(value = "gameLogFile", required = false) String gameLogFile) {
+        // MDC 값 재설정
+        if (gameLogFile != null && !gameLogFile.isEmpty()) {
+            MDC.put("gameLogFile", gameLogFile);
+        }
+        try {
+            SpecialEventResponse response = gameService.triggerSpecialEventIfAny(userId);
+            // 수정: SpecialEventResponse의 getTitle()을 이용하여 제목을 기록
+            gameLogger.info("User {} triggered special event: {}.", userId, response.getTitle());
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            gameLogger.info("User {} did not trigger any special event. Reason: {}", userId, e.getMessage());
+            return ResponseEntity.noContent().build();
+        }
+    }
+
+
+
     /**
      * /choice 엔드포인트에서도 클라이언트가 gameLogFile 식별자를 함께 보내야 합니다.
      * 이를 바탕으로 MDC를 재설정하고 로그를 기록합니다.
@@ -105,17 +127,6 @@ public class GameController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/special")
-    public ResponseEntity<SpecialEventResponse> triggerSpecialEvent(@RequestParam("userId") Long userId) {
-        try {
-            SpecialEventResponse response = gameService.triggerSpecialEventIfAny(userId);
-            return ResponseEntity.ok(response);
-        } catch (RuntimeException e) {
-            return ResponseEntity.noContent().build(); // 조건 미충족 시 204 반환
-        }
-    }
-
-
     /**
      * /ending 엔드포인트 역시 gameLogFile 식별자를 이용하여 MDC를 설정합니다.
      */
@@ -123,6 +134,7 @@ public class GameController {
     public ResponseEntity<Ending> getEndingEvent(
             @RequestParam("userId") Long userId,
             @RequestParam(value = "gameLogFile", required = false) String gameLogFile) {
+
         if (gameLogFile != null && !gameLogFile.isEmpty()) {
             MDC.put("gameLogFile", gameLogFile);
         }
