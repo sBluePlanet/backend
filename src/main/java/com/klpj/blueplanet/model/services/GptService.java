@@ -57,7 +57,7 @@ public class GptService {
         headers.setBearerAuth(apiKey);
 
         Map<String, Object> body = Map.of(
-                "model", "gpt-3.5-turbo",
+                "model", "gpt-4o",
                 "messages", List.of(Map.of("role", "user", "content", prompt)),
                 "temperature", 0.7
         );
