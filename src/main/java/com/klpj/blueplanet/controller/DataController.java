@@ -1,7 +1,7 @@
 package com.klpj.blueplanet.controller;
 
 import com.klpj.blueplanet.model.responses.*;
-import com.klpj.blueplanet.model.services.DataService;
+import com.klpj.blueplanet.model.services.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -39,8 +39,8 @@ public class DataController {
     @GetMapping("/emailDetail")
     public ResponseEntity<EmailDetailResponse> getEmailDetail(
             @RequestParam("userId") Long userId,
-            @RequestParam("eventId") Long eventId) {
-        EmailDetailResponse response = dataService.getEmailDetail(userId, eventId);
+            @RequestParam("eventId") Long id) {
+        EmailDetailResponse response = dataService.getEmailDetail(userId, id);
         return ResponseEntity.ok(response);
     }
 

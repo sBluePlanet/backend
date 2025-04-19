@@ -27,6 +27,4 @@ public class SpecialEventCondition {
     @Column(name = "variation")
     private int variation;
 
-    @Column(name = "priority")
-    private int priority;
 }

@@ -4,11 +4,14 @@ package com.klpj.blueplanet.model.services;
 import com.klpj.blueplanet.model.dao.*;
 import com.klpj.blueplanet.model.dto.*;
 import com.klpj.blueplanet.model.responses.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -19,9 +22,6 @@ public class GameService {
 
     @Autowired
     private UserStatusDao userStatusDao;
-
-    @Autowired
-    private PrologueDao prologueDao;
 
     @Autowired
     private EndingDao endingDao;
@@ -44,6 +44,8 @@ public class GameService {
     @Autowired
     private GptService gptService;
 
+    private static final Logger logger = LoggerFactory.getLogger(GameService.class);
+
     private List<SpecialEventCondition> cachedConditions; // 특별 이벤트 조건들을 미리 캐싱해두기 위한 변수
 
     private Random random = new Random();
@@ -62,13 +64,10 @@ public class GameService {
         status.setBiology(50);
         status.setPopularity(50);
         status.setTurnCount(1);
+
         UserStatus savedStatus = userStatusDao.save(status);
 
-        Prologue prologue = prologueDao.findAll()
-                .stream()
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("No prologue found."));
-        return new StartGameResponse(savedStatus, prologue, 1);
+        return new StartGameResponse(savedStatus, 2);
     }
 
     // 모든 특별 이벤트 발동 조건 미리 메모리에 로딩
@@ -78,8 +77,10 @@ public class GameService {
             try {
                 cachedConditions = specialEventConditionDao.findAll();
                 System.out.println("✅ 캐싱된 조건 수: " + cachedConditions.size());
+                logger.info("✅ 캐싱된 조건 수: {}", cachedConditions.size());
             } catch (Exception e) {
                 System.err.println("❌ 캐싱 실패: " + e.getMessage());
+                logger.error("❌ 캐싱 실패", e);
                 e.printStackTrace(); // 에러 로그 확인
             }
         };
@@ -135,6 +136,13 @@ public class GameService {
             throw new RuntimeException("No special event triggered.");
         }
 
+        triggered.sort(new Comparator<SpecialEvent>() {
+            @Override
+            public int compare(SpecialEvent o1, SpecialEvent o2) {
+                return o1.getPriority() - o2.getPriority();
+            }
+        });
+
         SpecialEvent event = triggered.get(0); // 하나만 처리
 
         // 수치 반영 (turnCount는 변경 ❌)
@@ -175,10 +183,6 @@ public class GameService {
         }
         // 랜덤으로 이벤트 선택
         Event selectedEvent = availableEvents.get(random.nextInt(availableEvents.size()));
-
-        // 선택된 이벤트 ID를 사용된 이벤트 목록에 추가 및 저장
-        userStatus.getUsedEventIds().add(selectedEvent.getId());
-        userStatusDao.save(userStatus);
 
         // 이벤트 정보를 EventResponse DTO로 생성
         EventResponse eventResponse = new EventResponse(
@@ -251,6 +255,10 @@ public class GameService {
         history.setChoiceId(choiceId);
         // history.setChosenAt(new Date()); // 기본값 생성자로 이미 현재 시각이 할당됨
 
+        // 선택된 이벤트 ID를 사용된 이벤트 목록에 추가 및 저장
+        userStatus.getUsedEventIds().add(choice.getEvent().getId());
+        userStatusDao.save(userStatus);
+
         userChoiceHistoryDao.save(history);  // UserChoiceHistoryDao를 주입 받아 사용합니다.
 
         // 다음 이벤트 타입 판단
@@ -320,15 +328,19 @@ public class GameService {
         return endings.get(random.nextInt(endings.size()));
     }
 
-    public String summarizeUserFlow(Long userId){
+    public String summarizeUserFlow(Long userId) {
         List<UserChoiceHistory> historyList = userChoiceHistoryDao.findByUserStatusIdOrderByChosenAtAsc(userId);
 
         StringBuilder sb = new StringBuilder();
-        sb.append("게임의 엔딩에 쓸 글인데 그동안 사용자가 이벤트에 대해 선택했던 선택지들과 그 흐름을 요약해서 정리해줘. " +
-                "다음의 내용을 게임 엔딩 형식으로 출력해줘 \n");
+        sb.append("아래 선택 이력을 기반으로 두 가지를 작성해줘:\n" +
+                "\n" +
+                "1. 플레이어 성향을 한 문장으로 요약 (당신은 ○○한 사람입니다. 형식 -> (큰따옴표로 묶지 않음.)\n" +
+                "2. 게임의 엔딩 장면처럼 플레이어의 플레이를 몰입감있게 분석. 플레이어는 당신이라는 호칭을 사용. (한글 250~300자 내외)\n" +
+                "\n" +
+                "게임의 스토리 텔러처럼 자연스럽게 쓰되, 좀 더 분석가처럼 작성해줘.\n");
         sb.append("사용자 ").append(userId).append("의 선택 이력 :\n\n");
 
-        for(UserChoiceHistory history : historyList){
+        for (UserChoiceHistory history : historyList) {
             Event event = eventDao.findById(history.getEventId()).orElse(null);
             Choice choice = choiceDao.findById(history.getChoiceId()).orElse(null);
 
@@ -338,7 +350,7 @@ public class GameService {
             sb.append("이벤트 : ").append(eventTitle).append("\n")
                     .append("선택 : ").append(choiceText).append("\n\n");
         }
-        return  sb.toString();
+        return sb.toString();
     }
 
 }

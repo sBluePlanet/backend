@@ -20,7 +20,7 @@ public class Event {
     @Column(length = 100)
     private String title;
 
-    @Column(length = 2000)
+    @Column(columnDefinition = "TEXT")
     private String content;
 
     @Column(length = 100)
@@ -28,4 +28,5 @@ public class Event {
 
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Choice> choices; // 이 이벤트에 연결된 선택지 리스트
+
 }
