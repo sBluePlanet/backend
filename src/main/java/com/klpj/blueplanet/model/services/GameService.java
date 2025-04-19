@@ -41,6 +41,9 @@ public class GameService {
     @Autowired
     private UserChoiceHistoryDao userChoiceHistoryDao;
 
+    @Autowired
+    private GptService gptService;
+
     private List<SpecialEventCondition> cachedConditions; // 특별 이벤트 조건들을 미리 캐싱해두기 위한 변수
 
     private Random random = new Random();
@@ -72,8 +75,13 @@ public class GameService {
     @Bean
     public ApplicationRunner loadSpecialEventConditionsAfterStartup() {
         return args -> {
-            cachedConditions = specialEventConditionDao.findAll();
-            System.out.println("✅ 캐싱된 조건 수: " + cachedConditions.size());
+            try {
+                cachedConditions = specialEventConditionDao.findAll();
+                System.out.println("✅ 캐싱된 조건 수: " + cachedConditions.size());
+            } catch (Exception e) {
+                System.err.println("❌ 캐싱 실패: " + e.getMessage());
+                e.printStackTrace(); // 에러 로그 확인
+            }
         };
     }
 
@@ -311,4 +319,26 @@ public class GameService {
         }
         return endings.get(random.nextInt(endings.size()));
     }
+
+    public String summarizeUserFlow(Long userId){
+        List<UserChoiceHistory> historyList = userChoiceHistoryDao.findByUserStatusIdOrderByChosenAtAsc(userId);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("게임의 엔딩에 쓸 글인데 그동안 사용자가 이벤트에 대해 선택했던 선택지들과 그 흐름을 요약해서 정리해줘. " +
+                "다음의 내용을 게임 엔딩 형식으로 출력해줘 \n");
+        sb.append("사용자 ").append(userId).append("의 선택 이력 :\n\n");
+
+        for(UserChoiceHistory history : historyList){
+            Event event = eventDao.findById(history.getEventId()).orElse(null);
+            Choice choice = choiceDao.findById(history.getChoiceId()).orElse(null);
+
+            String eventTitle = event != null ? event.getTitle() : "알 수 없는 이벤트";
+            String choiceText = choice != null ? choice.getContent() : "알 수 없는 선택지";
+
+            sb.append("이벤트 : ").append(eventTitle).append("\n")
+                    .append("선택 : ").append(choiceText).append("\n\n");
+        }
+        return  sb.toString();
+    }
+
 }
